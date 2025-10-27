@@ -1,0 +1,29 @@
+input_image: data/example_sheet.png
+input_mask: data/example_mask.png
+output_dir: out
+
+model:
+  type: fba
+  weights: checkpoints/fba_matting.pth
+  amp: true
+  device: cuda:0
+  fba_repo: /path/to/FBA_Matting
+
+sprite:
+  min_area: 100
+  pad: 20
+  tri_fg_px: 8
+  tri_bg_px: 8
+  max_crop_pixels: 1500000
+
+batching:
+  pixel_budget: 2000000
+  pad_multiple: 32
+
+multi_gpu:
+  enabled: false
+  devices: [cuda:0, cuda:1]
+
+save:
+  save_per_sprite: false
+  save_composites: false
