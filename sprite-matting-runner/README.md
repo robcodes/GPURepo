@@ -23,3 +23,14 @@ The runner loads `networks.models` directly from the upstream [FBA_Matting](http
 - Environment variable: `SMR_FBA_REPO=/kaggle/working/FBA_Matting`
 
 The helper will temporarily prepend the provided directory to `PYTHONPATH` so the import succeeds, which avoids manual shell manipulation when running on Kaggle or other notebook hosts.
+
+## Kaggle notebook quick start
+
+Paste [`examples/kaggle_notebook_cell.py`](examples/kaggle_notebook_cell.py) into a
+single Python cell inside your Kaggle notebook. Update the `IMG`, `MSK`, and
+`SRC_WEIGHTS` paths near the top of the snippet before running it—the helper
+will abort early with a clear error if the placeholder values remain or the
+files are missing. The cell keeps both this repository and the upstream
+`FBA_Matting` project synced to their default branches, performs an editable
+install, and then launches the CLI with `SMR_FBA_REPO` set so no manual
+`PYTHONPATH` tweaks are required.
