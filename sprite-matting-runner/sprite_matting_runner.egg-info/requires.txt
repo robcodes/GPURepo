@@ -1,0 +1,10 @@
+torch
+torchvision
+opencv-python-headless
+numpy
+tqdm
+pydantic<3,>=1.10
+PyYAML
+
+[dev]
+pytest
