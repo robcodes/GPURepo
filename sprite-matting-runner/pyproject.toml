@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sprite-matting-runner"
+version = "0.1.0"
+description = "GPU-batched sprite sheet matting runner"
+readme = "README.md"
+authors = [{name = "sprite-matting-runner contributors"}]
+license = {file = "LICENSE"}
+requires-python = ">=3.10"
+dependencies = [
+  "torch",
+  "torchvision",
+  "opencv-python-headless",
+  "numpy",
+  "tqdm",
+  "pydantic>=1.10,<3",
+  "PyYAML",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+]
+
+[project.scripts]
+sprite-matting = "sprite_matting.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["sprite_matting*"]
