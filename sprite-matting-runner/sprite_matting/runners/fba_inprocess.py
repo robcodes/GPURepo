@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import importlib
 import time
+import os
+import sys
 from dataclasses import replace
+from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
+import cv2
 import numpy as np
 import torch
-import cv2
 
 from ..batching import bucketize, prepare_fba_tensors
 from ..config import Config
@@ -66,7 +69,7 @@ def _run_single_device(
     canvas_shape: Tuple[int, int],
     device: torch.device,
 ) -> Dict[str, object]:
-    model = _load_fba_model(cfg.model.weights, device)
+    model = _load_fba_model(cfg.model.weights, device, getattr(cfg.model, "fba_repo", None))
     model.eval()
 
     alpha_canvas = init_canvas(*canvas_shape)
@@ -125,8 +128,8 @@ def _resolve_device(device_str: str) -> torch.device:
     return torch.device(device_str)
 
 
-def _load_fba_model(weights_path: str, device: torch.device) -> torch.nn.Module:
-    module = importlib.import_module("networks.models")
+def _load_fba_model(weights_path: str, device: torch.device, repo_hint: Optional[str]) -> torch.nn.Module:
+    module = _import_fba_models(repo_hint, weights_path)
     build_model = getattr(module, "build_model")
     try:
         model = build_model()
@@ -144,6 +147,47 @@ def _load_fba_model(weights_path: str, device: torch.device) -> torch.nn.Module:
     model.load_state_dict(cleaned, strict=False)
     model.to(device)
     return model
+
+
+def _import_fba_models(repo_hint: Optional[str], weights_path: str):
+    candidates = []
+    def _normalize(path_str: str) -> Optional[Path]:
+        try:
+            return Path(path_str).expanduser().resolve()
+        except FileNotFoundError:
+            return Path(path_str).expanduser()
+
+    if repo_hint:
+        candidates.append(_normalize(repo_hint))
+    env_hint = os.getenv("SMR_FBA_REPO")
+    if env_hint:
+        candidates.append(_normalize(env_hint))
+    env_hint2 = os.getenv("FBA_MATTING_REPO")
+    if env_hint2:
+        candidates.append(_normalize(env_hint2))
+
+    weights_parent = Path(weights_path).expanduser().resolve().parent
+    candidates.extend([weights_parent, weights_parent.parent])
+
+    for path in candidates:
+        if not path:
+            continue
+        if path.is_file():
+            path = path.parent
+        if not path.exists():
+            continue
+        str_path = str(path)
+        if str_path not in sys.path:
+            sys.path.insert(0, str_path)
+
+    try:
+        return importlib.import_module("networks.models")
+    except ModuleNotFoundError as exc:  # pragma: no cover - informative error path
+        raise ModuleNotFoundError(
+            "Unable to import 'networks.models'. Provide the FBA_Matting repository "
+            "via --fba-repo, the SMR_FBA_REPO environment variable, or ensure it is "
+            "installed on PYTHONPATH."
+        ) from exc
 
 
 def _extract_alpha_tensor(output: object) -> Optional[torch.Tensor]:

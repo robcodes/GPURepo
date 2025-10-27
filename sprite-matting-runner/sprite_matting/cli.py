@@ -25,6 +25,8 @@ def build_parser() -> argparse.ArgumentParser:
     run_p.add_argument("--out-dir", dest="output_dir", required=True)
     run_p.add_argument("--model", dest="model_type", default=None)
     run_p.add_argument("--weights", dest="model_weights", default=None)
+    run_p.add_argument("--fba-repo", dest="model_fba_repo", default=None,
+                       help="Path to the cloned FBA_Matting repository")
     run_p.add_argument("--amp", dest="model_amp", action="store_true")
     run_p.add_argument("--no-amp", dest="model_amp", action="store_false")
     run_p.set_defaults(model_amp=None)

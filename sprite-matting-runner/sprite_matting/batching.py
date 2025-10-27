@@ -97,7 +97,7 @@ def prepare_fba_tensors(
     images = torch.zeros((b, 3, h_pad, w_pad), dtype=torch.float32, device=device)
     tri_two = torch.zeros((b, 2, h_pad, w_pad), dtype=torch.float32, device=device)
     image_n = torch.zeros_like(images)
-    tri_feat = torch.zeros((b, 5, h_pad, w_pad), dtype=torch.float32, device=device)
+    tri_feat = torch.zeros((b, 6, h_pad, w_pad), dtype=torch.float32, device=device)
     sizes: List[Tuple[int, int]] = []
 
     mean = torch.tensor([0.485, 0.456, 0.406], device=device).view(3, 1, 1)
@@ -112,22 +112,14 @@ def prepare_fba_tensors(
         tri_t = torch.from_numpy(tri).to(device)
         images[i, :3, :h, :w] = rgb_t
         image_n[i, :3, :h, :w] = (rgb_t - mean) / std
-        fg = (tri_t == 1.0).float()
-        bg = (tri_t == 0.0).float()
-        tri_two[i, 0, :h, :w] = bg
-        tri_two[i, 1, :h, :w] = fg
-        unknown_mask = (tri_t == 0.5).float()
-        unknown_dist = cv2.distanceTransform((tri == 0.5).astype(np.uint8), cv2.DIST_L2, 3)
-        if unknown_dist.max() > 0:
-            unknown_dist = unknown_dist / unknown_dist.max()
-        sobel_x = cv2.Sobel(tri, cv2.CV_32F, 1, 0, ksize=3)
-        sobel_y = cv2.Sobel(tri, cv2.CV_32F, 0, 1, ksize=3)
-        lap = cv2.Laplacian(tri, cv2.CV_32F, ksize=3)
-        tri_feat[i, 0, :h, :w] = unknown_mask
-        tri_feat[i, 1, :h, :w] = torch.from_numpy(unknown_dist.astype(np.float32)).to(device)
-        tri_feat[i, 2, :h, :w] = torch.from_numpy(sobel_x).to(device)
-        tri_feat[i, 3, :h, :w] = torch.from_numpy(sobel_y).to(device)
-        tri_feat[i, 4, :h, :w] = torch.from_numpy(lap).to(device)
+        fg_np = (tri == 1.0).astype(np.float32)
+        bg_np = (tri == 0.0).astype(np.float32)
+        tri_two[i, 0, :h, :w] = torch.from_numpy(bg_np).to(device)
+        tri_two[i, 1, :h, :w] = torch.from_numpy(fg_np).to(device)
+
+        two_chan = np.stack((bg_np, fg_np), axis=2)
+        tri_features = _trimap_transform(two_chan, max(h, w))
+        tri_feat[i, :6, :h, :w] = torch.from_numpy(tri_features).to(device)
     return images, tri_two, image_n, tri_feat, sizes
 
 
@@ -135,3 +127,38 @@ def _pad_to_multiple(value: int, multiple: int) -> int:
     if multiple <= 0:
         return value
     return int(math.ceil(value / multiple) * multiple)
+
+
+_SIGMA_SCALES = (0.02, 0.08, 0.16)
+
+
+def _trimap_transform(two_chan: np.ndarray, length: int) -> np.ndarray:
+    """Replicate FBA's trimap feature transform.
+
+    Args:
+        two_chan: Array of shape (H, W, 2) with background/foreground masks in {0, 1}.
+        length: Spatial scale used in the Gaussian falloff.
+
+    Returns:
+        np.ndarray of shape (6, H, W) containing distance-based features.
+    """
+
+    h, w, _ = two_chan.shape
+    L = max(int(length), 1)
+    features = []
+    for k in range(2):
+        channel = two_chan[:, :, k]
+        # Invert mask: distances are computed from the boundary of the region.
+        inverted = 1.0 - channel
+        dt_mask = -_distance_transform(inverted) ** 2
+        for sigma in _SIGMA_SCALES:
+            denom = 2.0 * ((sigma * L) ** 2)
+            if denom <= 0:
+                denom = 1.0
+            features.append(np.exp(dt_mask / denom))
+    return np.stack(features, axis=0).astype(np.float32)
+
+
+def _distance_transform(mask: np.ndarray) -> np.ndarray:
+    mask_u8 = (mask > 0.5).astype(np.uint8)
+    return cv2.distanceTransform(mask_u8, cv2.DIST_L2, 0).astype(np.float32)

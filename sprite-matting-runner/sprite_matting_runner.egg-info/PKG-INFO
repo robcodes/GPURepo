@@ -55,3 +55,12 @@ See `examples/example_config.yaml` for a quick-start configuration.
 
 
 > **Note:** The public FBA Matting weights shipped by the community are licensed for non-commercial research. Provide your own checkpoint path if you require different licensing.
+
+## FBA model setup
+
+The runner loads `networks.models` directly from the upstream [FBA_Matting](https://github.com/MarcoForte/FBA_Matting) repository. If that package is not installed in your environment, supply the path to a local clone via either of:
+
+- CLI flag: `--fba-repo /kaggle/working/FBA_Matting`
+- Environment variable: `SMR_FBA_REPO=/kaggle/working/FBA_Matting`
+
+The helper will temporarily prepend the provided directory to `PYTHONPATH` so the import succeeds, which avoids manual shell manipulation when running on Kaggle or other notebook hosts.

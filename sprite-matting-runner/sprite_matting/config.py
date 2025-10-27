@@ -17,6 +17,7 @@ class ModelConfig:
     weights: str = "checkpoints/fba_matting.pth"
     amp: bool = True
     device: str = "cuda:0"
+    fba_repo: str | None = None
 
 
 @dataclass
